@@ -60,6 +60,7 @@
         <form action="/add" method="POST">
             <input type="text" name="title" placeholder="{{ t.placeholder }}" required>
             <input type="date" name="due_date" required>
+            <input type="email" name="email" value="fouedkarkni9333@gmail.com" placeholder="بريد التنبيهات..." required>
             <div style="display: flex; gap: 10px;">
                 <select name="priority" style="flex: 1;">
                     <option value="{{ t.priority_normal }}">{{ t.priority_normal }}</option>
@@ -81,7 +82,7 @@
             <li>
                 <div class="task-info">
                     <strong>{{ task[1] }}</strong>
-                    <small>{{ t.due }} {{ task[2] }}</small>
+                    <small>{{ t.due }} {{ task[2] }} | 📧 {{ task[5] }}</small>
                 </div>
                 <div class="meta">
                     <span class="cat-badge">{{ task[4] }}</span>
