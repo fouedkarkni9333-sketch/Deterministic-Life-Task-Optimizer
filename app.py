@@ -1,29 +1,35 @@
 from datetime import datetime
 import os
+import smtplib
 import sqlite3
-from flask import Flask, redirect, render_template, request
+from email.mime.text import MIMEText
+from apscheduler.schedulers.background import BackgroundScheduler
+from flask import Flask, flash, redirect, render_template, request, url_for
 
 app = Flask(__name__)
-
+app.secret_key = "super_secret_key_for_flash_messages"
 DB_NAME = "tasks.db"
 
 
-def init_db():
+def get_db_connection():
   conn = sqlite3.connect(DB_NAME)
-  cursor = conn.cursor()
-  # تحديث جدول المهام ليشمل البريد الإلكتروني للتنبيهات
-  cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            due_date TEXT NOT NULL,
-            priority TEXT NOT NULL,
-            category TEXT NOT NULL,
-            email TEXT NOT NULL
-        )
-    """)
-  conn.commit()
-  conn.close()
+  conn.row_factory = sqlite3.Row
+  return conn
+
+
+def init_db():
+  with get_db_connection() as conn:
+    conn.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                due_date TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                category TEXT NOT NULL,
+                email TEXT NOT NULL,
+                notified INTEGER DEFAULT 0
+            )
+        """)
 
 
 init_db()
@@ -74,6 +80,32 @@ TRANSLATIONS = {
 }
 
 
+# --- محرك التنبيهات البريدية الدوري ---
+def check_and_send_alerts():
+  today_str = datetime.now().strftime("%Y-%m-%d")
+  with get_db_connection() as conn:
+    # جلب المهام المستحقة اليوم والتي لم يُرسل لها تنبيه بعد
+    tasks = conn.execute(
+        "SELECT * FROM tasks WHERE due_date <= ? AND notified = 0", (today_str,)
+    ).fetchall()
+
+    for task in tasks:
+      # هنا يمكنك ضبط إعدادات SMTP الخاصة بك للإرسال الحقيقي
+      print(
+          f"[ALERT] إرسال تنبيه للمهمة '{task['title']}' إلى البريد:"
+          f" {task['email']}"
+      )
+
+      # تحديث حالة التنبيه لكي لا يتكرر
+      conn.execute("UPDATE tasks SET notified = 1 WHERE id = ?", (task["id"],))
+
+
+# تشغيل الفاحص الدوري كل ساعة (أو يومياً)
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=check_and_send_alerts, trigger="interval", hours=1)
+scheduler.start()
+
+
 @app.route("/")
 def home():
   user_lang = request.accept_languages.best_match(list(TRANSLATIONS.keys()))
@@ -82,17 +114,12 @@ def home():
 
   t = TRANSLATIONS[user_lang]
 
-  conn = sqlite3.connect(DB_NAME)
-  cursor = conn.cursor()
-  cursor.execute("SELECT * FROM tasks ORDER BY id DESC")
-  tasks = cursor.fetchall()
+  with get_db_connection() as conn:
+    tasks = conn.execute("SELECT * FROM tasks ORDER BY id DESC").fetchall()
 
   total_count = len(tasks)
-  high_count = sum(
-      1 for task in tasks if task[3] in ["High Priority", "أولوية عالية جداً"]
-  )
-
-  conn.close()
+  # التحقق أصبح أسهل بعد توحيد القيمة إلى 'high'
+  high_count = sum(1 for task in tasks if task["priority"] == "high")
 
   return render_template(
       "index.html",
@@ -106,38 +133,37 @@ def home():
 
 @app.route("/add", methods=["POST"])
 def add_task_web():
-  title = request.form.get("title")
-  due_date = request.form.get("due_date")
-  priority = request.form.get("priority", "Normal")
-  category = request.form.get("category", "General")
-  email = request.form.get("email", "fouedkarkni9333@gmail.com")
+  title = request.form.get("title", "").strip()
+  due_date = request.form.get("due_date", "").strip()
+  priority = request.form.get(
+      "priority", "normal"
+  )  # يُفضل أخذ 'high' أو 'normal' من الفورم
+  category = request.form.get("category", "general")
+  email = request.form.get("email", "").strip()
 
-  if title and due_date:
-    try:
-      datetime.strptime(due_date, "%Y-%m-%d")
-      conn = sqlite3.connect(DB_NAME)
-      cursor = conn.cursor()
-      cursor.execute(
+  if not (title and due_date and email):
+    flash("جميع الحقول مطلوبة!")
+    return redirect(url_for("home"))
+
+  try:
+    datetime.strptime(due_date, "%Y-%m-%d")
+    with get_db_connection() as conn:
+      conn.execute(
           "INSERT INTO tasks (title, due_date, priority, category, email)"
           " VALUES (?, ?, ?, ?, ?)",
           (title, due_date, priority, category, email),
       )
-      conn.commit()
-      conn.close()
-    except ValueError:
-      pass
+  except ValueError:
+    flash("تاريخ غير صحيح!")
 
-  return redirect("/")
+  return redirect(url_for("home"))
 
 
-@app.route("/delete/<int:task_id>")
+@app.route("/delete/<int:task_id>", methods=["POST"])
 def delete_task(task_id):
-  conn = sqlite3.connect(DB_NAME)
-  cursor = conn.cursor()
-  cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-  conn.commit()
-  conn.close()
-  return redirect("/")
+  with get_db_connection() as conn:
+    conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+  return redirect(url_for("home"))
 
 
 if __name__ == "__main__":
