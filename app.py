@@ -1,13 +1,32 @@
 from datetime import datetime
+import sqlite3
 from flask import Flask, jsonify, redirect, render_template_string, request
 
 app = Flask(__name__)
 
-# استخدام قائمة في الذاكرة لتخزين المهام بشكل دائم أثناء التشغيل (أو قاعدة بيانات بسيطة)
-# سنطورها لاحقاً لترتبط بـ SQLite بشكل كامل
-TASKS_DATABASE = []
+DB_NAME = "tasks.db"
 
-# تصميم واجهة مستخدم (HTML/CSS) أنيقة وسريعة مباشرة من السيرفر
+
+# دته لتهيئة قاعدة البيانات وإنشاء الجدول إذا لم يكن موجوداً
+def init_db():
+  conn = sqlite3.connect(DB_NAME)
+  cursor = conn.cursor()
+  cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            due_date TEXT NOT NULL,
+            priority TEXT NOT NULL
+        )
+    """)
+  conn.commit()
+  conn.close()
+
+
+# تشغيل تهيئة قاعدة البيانات عند بدء التشغيل
+init_db()
+
+# تصميم واجهة المستخدم الأنيقة
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -42,15 +61,15 @@ HTML_TEMPLATE = """
             <button type="submit">تثبيت وإضافة المهمة</button>
         </form>
         
-        <h2>المهام الموثقة:</h2>
+        <h2>المهام الموثقة بقاعدة البيانات:</h2>
         <ul>
             {% for task in tasks %}
             <li>
                 <div class="task-info">
-                    <strong>{{ task.title }}</strong>
-                    <small>الموعد: {{ task.due_date }}</small>
+                    <strong>{{ task[1] }}</strong>
+                    <small>الموعد: {{ task[2] }}</small>
                 </div>
-                <span class="badge">{{ task.priority }}</span>
+                <span class="badge">{{ task[3] }}</span>
             </li>
             {% else %}
             <p style="text-align: center; color: #7f8c8d;">لا توجد مهام مسجلة حالياً.</p>
@@ -64,10 +83,15 @@ HTML_TEMPLATE = """
 
 @app.route("/")
 def home():
-  return render_template_string(HTML_TEMPLATE, tasks=TASKS_DATABASE)
+  conn = sqlite3.connect(DB_NAME)
+  cursor = conn.cursor()
+  cursor.execute("SELECT * FROM tasks ORDER BY id DESC")
+  tasks = cursor.fetchall()
+  conn.close()
+  return render_template_string(HTML_TEMPLATE, tasks=tasks)
 
 
-# محرك إضافة المهام عبر الواجهة أو الـ API بصرامة تامة
+# محرك إضافة المهام بدقة وحفظها في SQLite
 @app.route("/add", methods=["POST"])
 def add_task_web():
   title = request.form.get("title")
@@ -75,16 +99,16 @@ def add_task_web():
   priority = request.form.get("priority", "عادية")
 
   if title and due_date:
-    # تحقق صارم من التاريخ
     try:
       datetime.strptime(due_date, "%Y-%m-%d")
-      task = {
-          "id": len(TASKS_DATABASE) + 1,
-          "title": title,
-          "due_date": due_date,
-          "priority": priority,
-      }
-      TASKS_DATABASE.append(task)
+      conn = sqlite3.connect(DB_NAME)
+      cursor = conn.cursor()
+      cursor.execute(
+          "INSERT INTO tasks (title, due_date, priority) VALUES (?, ?, ?)",
+          (title, due_date, priority),
+      )
+      conn.commit()
+      conn.close()
     except ValueError:
       pass
 
