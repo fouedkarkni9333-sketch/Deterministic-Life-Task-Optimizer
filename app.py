@@ -1,6 +1,7 @@
 from datetime import datetime
+import os
 import sqlite3
-from flask import Flask, redirect, render_template_string, request
+from flask import Flask, redirect, render_template, request
 
 app = Flask(__name__)
 
@@ -147,4 +148,88 @@ TRANSLATIONS = {
         "delete": "Complete & Delete",
         "analytics": "Productivity Analytics Dashboard",
         "total_tasks": "Total Tasks:",
-        "high_priority":
+        "high_priority": "High Priority Tasks:",
+        "dark_mode": "Dark Mode",
+        "light_mode": "Light Mode",
+        "dir": "ltr",
+    },
+}
+
+
+@app.route("/")
+def home():
+  user_lang = request.accept_languages.best_match(list(TRANSLATIONS.keys()))
+  if not user_lang or user_lang not in TRANSLATIONS:
+    user_lang = "en"
+
+  t = TRANSLATIONS[user_lang]
+
+  conn = sqlite3.connect(DB_NAME)
+  cursor = conn.cursor()
+  cursor.execute("SELECT * FROM tasks ORDER BY id DESC")
+  tasks = cursor.fetchall()
+
+  total_count = len(tasks)
+  high_count = sum(
+      1
+      for task in tasks
+      if task[3]
+      in [
+          "High Priority",
+          "أولوية عالية جداً",
+          "高优先级",
+          "Hohe Priorität",
+          "Haute priorité",
+          "Alta prioridad",
+      ]
+  )
+
+  conn.close()
+
+  return render_template(
+      "index.html",
+      t=t,
+      lang=user_lang,
+      tasks=tasks,
+      total_count=total_count,
+      high_count=high_count,
+  )
+
+
+@app.route("/add", methods=["POST"])
+def add_task_web():
+  title = request.form.get("title")
+  due_date = request.form.get("due_date")
+  priority = request.form.get("priority", "Normal")
+  category = request.form.get("category", "General")
+
+  if title and due_date:
+    try:
+      datetime.strptime(due_date, "%Y-%m-%d")
+      conn = sqlite3.connect(DB_NAME)
+      cursor = conn.cursor()
+      cursor.execute(
+          "INSERT INTO tasks (title, due_date, priority, category) VALUES (?, ?,"
+          " ?, ?)",
+          (title, due_date, priority, category),
+      )
+      conn.commit()
+      conn.close()
+    except ValueError:
+      pass
+
+  return redirect("/")
+
+
+@app.route("/delete/<int:task_id>")
+def delete_task(task_id):
+  conn = sqlite3.connect(DB_NAME)
+  cursor = conn.cursor()
+  cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+  conn.commit()
+  conn.close()
+  return redirect("/")
+
+
+if __name__ == "__main__":
+  app.run(host="0.0.0.0", port=5000, debug=True)
