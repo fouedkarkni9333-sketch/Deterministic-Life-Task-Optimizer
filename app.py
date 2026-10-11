@@ -1,17 +1,15 @@
-from datetime import datetime
+from flask import Flask, render_template_string, request, redirect
 import sqlite3
-from flask import Flask, redirect, render_template_string, request
+from datetime import datetime
 
 app = Flask(__name__)
 
 DB_NAME = "tasks.db"
 
-
 def init_db():
-  conn = sqlite3.connect(DB_NAME)
-  cursor = conn.cursor()
-  # تحديث جدول المهام ليشمل التصنيف (category)
-  cursor.execute("""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -19,10 +17,9 @@ def init_db():
             priority TEXT NOT NULL,
             category TEXT NOT NULL
         )
-    """)
-  conn.commit()
-  conn.close()
-
+    ''')
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -41,12 +38,12 @@ TRANSLATIONS = {
         "due": "الموعد:",
         "empty": "لا توجد مهام مسجلة حالياً.",
         "delete": "إنجاز وحذف",
-        "analytics": "لوحة تحليلات وإحصائيات الإنتاجية",
+        "analytics": "لوحة تحليلات والإحصائيات الإنتاجية",
         "total_tasks": "إجمالي المهام:",
         "high_priority": "المهام ذات الأولوية العالية:",
         "dark_mode": "الوضع الداكن",
         "light_mode": "الوضع المضيء",
-        "dir": "rtl",
+        "dir": "rtl"
     },
     "zh": {
         "title": "全球智能生活与任务优化器",
@@ -67,7 +64,7 @@ TRANSLATIONS = {
         "high_priority": "高优先级任务：",
         "dark_mode": "深色模式",
         "light_mode": "浅色模式",
-        "dir": "ltr",
+        "dir": "ltr"
     },
     "de": {
         "title": "Globaler Intelligenz- und Aufgaben-Optimizer",
@@ -88,7 +85,7 @@ TRANSLATIONS = {
         "high_priority": "Hohe Priorität:",
         "dark_mode": "Dunkelmodus",
         "light_mode": "Hellmodus",
-        "dir": "ltr",
+        "dir": "ltr"
     },
     "fr": {
         "title": "Optimiseur Intelligent de Vie et de Tâches",
@@ -109,7 +106,7 @@ TRANSLATIONS = {
         "high_priority": "Priorité haute :",
         "dark_mode": "Mode sombre",
         "light_mode": "Mode clair",
-        "dir": "ltr",
+        "dir": "ltr"
     },
     "es": {
         "title": "Optimizador Global de Vida y Tareas",
@@ -130,7 +127,7 @@ TRANSLATIONS = {
         "high_priority": "Prioridad alta:",
         "dark_mode": "Modo oscuro",
         "light_mode": "Modo claro",
-        "dir": "ltr",
+        "dir": "ltr"
     },
     "en": {
         "title": "Global Deterministic Life & Task Optimizer",
@@ -151,8 +148,8 @@ TRANSLATIONS = {
         "high_priority": "High Priority Tasks:",
         "dark_mode": "Dark Mode",
         "light_mode": "Light Mode",
-        "dir": "ltr",
-    },
+        "dir": "ltr"
+    }
 }
 
 HTML_TEMPLATE = """
@@ -210,34 +207,9 @@ HTML_TEMPLATE = """
             <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 {{ t.dark_mode }}</button>
         </div>
 
-        <!-- لوحة التحليلات والإحصائيات -->
         <div class="analytics-box">
             <h3>📊 {{ t.analytics }}</h3>
             <p>📌 {{ t.total_tasks }} <strong>{{ total_count }}</strong> | 🔥 {{ t.high_priority }} <strong>{{ high_count }}</strong></p>
         </div>
 
         <form action="/add" method="POST">
-            <input type="text" name="title" placeholder="{{ t.placeholder }}" required>
-            <input type="date" name="due_date" required>
-            <div style="display: flex; gap: 10px;">
-                <select name="priority" style="flex: 1;">
-                    <option value="{{ t.priority_normal }}">{{ t.priority_normal }}</option>
-                    <option value="{{ t.priority_high }}">{{ t.priority_high }}</option>
-                </select>
-                <select name="category" style="flex: 1;">
-                    <option value="{{ t.cat_work }}">{{ t.cat_work }}</option>
-                    <option value="{{ t.cat_personal }}">{{ t.cat_personal }}</option>
-                    <option value="{{ t.cat_study }}">{{ t.cat_study }}</option>
-                    <option value="{{ t.cat_health }}">{{ t.cat_health }}</option>
-                </select>
-            </div>
-            <button type="submit" class="submit-btn">{{ t.btn }}</button>
-        </form>
-        
-        <h2>{{ t.list_title }}</h2>
-        <ul>
-            {% for task in tasks %}
-            <li>
-                <div class="task-info">
-                    <strong>{{ task[1] }}</strong>
-                    <small>{{ t.due }} {{
