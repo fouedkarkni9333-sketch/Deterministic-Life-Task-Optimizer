@@ -34,6 +34,7 @@ TRANSLATIONS = {
         "list_title": "المهام الموثقة:",
         "due": "الموعد:",
         "empty": "لا توجد مهام مسجلة حالياً.",
+        "delete": "إنجاز وحذف",
         "dir": "rtl",
     },
     "zh": {
@@ -45,6 +46,7 @@ TRANSLATIONS = {
         "list_title": "已验证的任务：",
         "due": "截止日期：",
         "empty": "暂无记录的任务。",
+        "delete": "完成并删除",
         "dir": "ltr",
     },
     "de": {
@@ -56,6 +58,7 @@ TRANSLATIONS = {
         "list_title": "Verifizierte Aufgaben:",
         "due": "Fälligkeitsdatum:",
         "empty": "Noch keine Aufgaben registriert.",
+        "delete": "Erledigen & Löschen",
         "dir": "ltr",
     },
     "fr": {
@@ -67,6 +70,7 @@ TRANSLATIONS = {
         "list_title": "Tâches vérifiées :",
         "due": "Date d'échéance :",
         "empty": "Aucune tâche enregistrée pour le moment.",
+        "delete": "Terminer & Supprimer",
         "dir": "ltr",
     },
     "es": {
@@ -78,6 +82,7 @@ TRANSLATIONS = {
         "list_title": "Tareas verificadas:",
         "due": "Fecha límite:",
         "empty": "No hay tareas registradas aún.",
+        "delete": "Completar y borrar",
         "dir": "ltr",
     },
     "en": {
@@ -89,6 +94,7 @@ TRANSLATIONS = {
         "list_title": "Verified Tasks:",
         "due": "Due Date:",
         "empty": "No tasks registered yet.",
+        "delete": "Complete & Delete",
         "dir": "ltr",
     },
 }
@@ -111,7 +117,10 @@ HTML_TEMPLATE = """
         ul { list-style: none; padding: 0; }
         li { background: #ecf0f1; margin-bottom: 8px; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
         .task-info { display: flex; flex-direction: column; gap: 3px; }
+        .meta { display: flex; gap: 10px; align-items: center; }
         .badge { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; width: fit-content; }
+        .delete-btn { background-color: #c0392b; color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold; }
+        .delete-btn:hover { background-color: #a93226; }
     </style>
 </head>
 <body>
@@ -135,7 +144,10 @@ HTML_TEMPLATE = """
                     <strong>{{ task[1] }}</strong>
                     <small>{{ t.due }} {{ task[2] }}</small>
                 </div>
-                <span class="badge">{{ task[3] }}</span>
+                <div class="meta">
+                    <span class="badge">{{ task[3] }}</span>
+                    <a href="/delete/{{ task[0] }}" class="delete-btn">{{ t.delete }}</a>
+                </div>
             </li>
             {% else %}
             <p style="text-align: center; color: #7f8c8d;">{{ t.empty }}</p>
@@ -184,6 +196,17 @@ def add_task_web():
     except ValueError:
       pass
 
+  return redirect("/")
+
+
+# مسار حذف المهمة فور إنجازها
+@app.route("/delete/<int:task_id>")
+def delete_task(task_id):
+  conn = sqlite3.connect(DB_NAME)
+  cursor = conn.cursor()
+  cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+  conn.commit()
+  conn.close()
   return redirect("/")
 
 
