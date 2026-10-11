@@ -24,7 +24,6 @@ def init_db():
 
 init_db()
 
-# قاموس الترجمات الشامل للغات العالم الرئيسية (يمكن إضافة أي لغة بسهولة)
 TRANSLATIONS = {
     "ar": {
         "title": "منظم الحياة والمهام الذكي العالمي",
@@ -150,10 +149,9 @@ HTML_TEMPLATE = """
 
 @app.route("/")
 def home():
-  # الكشف التلقائي عن لغة متصفح المستخدم في أي مكان في العالم
   user_lang = request.accept_languages.best_match(list(TRANSLATIONS.keys()))
   if not user_lang or user_lang not in TRANSLATIONS:
-    user_lang = "en"  # اللغة الافتراضية إذا لم يتم التعرف على اللغة
+    user_lang = "en"
 
   t = TRANSLATIONS[user_lang]
 
@@ -190,4 +188,4 @@ def add_task_web():
 
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port5000, debug=True)
+  app.run(host="0.0.0.0", port=5000, debug=True)
