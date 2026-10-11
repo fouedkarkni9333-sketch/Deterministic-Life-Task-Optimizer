@@ -36,13 +36,15 @@
         button.submit-btn:hover { background-color: var(--btn-hover); }
         .analytics-box { background: var(--li-bg); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
         .analytics-box h3 { margin: 0 0 8px 0; font-size: 16px; }
+        .alert-flash { background-color: #e74c3c; color: white; padding: 10px; border-radius: 5px; margin-bottom: 15px; text-align: center; font-weight: bold; }
         ul { list-style: none; padding: 0; }
         li { background: var(--li-bg); margin-bottom: 8px; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
         .task-info { display: flex; flex-direction: column; gap: 3px; }
         .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .badge { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
         .cat-badge { background: #2980b9; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
-        .delete-btn { background-color: #c0392b; color: white; padding: 5px 8px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: bold; }
+        .delete-btn { background-color: #c0392b; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .delete-btn:hover { background-color: #a93226; }
     </style>
 </head>
 <body data-theme="light">
@@ -52,6 +54,15 @@
             <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 {{ t.dark_mode }}</button>
         </div>
 
+        <!-- عرض رسائل الأخطاء أو التنبيهات القادمة من الباك إند -->
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert-flash">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
         <div class="analytics-box">
             <h3>📊 {{ t.analytics }}</h3>
             <p>📌 {{ t.total_tasks }} <strong>{{ total_count }}</strong> | 🔥 {{ t.high_priority }} <strong>{{ high_count }}</strong></p>
@@ -60,11 +71,12 @@
         <form action="/add" method="POST">
             <input type="text" name="title" placeholder="{{ t.placeholder }}" required>
             <input type="date" name="due_date" required>
-            <input type="email" name="email" value="fouedkarkni9333@gmail.com" placeholder="بريد التنبيهات..." required>
+            <input type="email" name="email" placeholder="بريد التنبيهات..." required>
             <div style="display: flex; gap: 10px;">
+                <!-- استخدام قيم ثابتة للـ Backend وتسميات مترجمة للمستخدم -->
                 <select name="priority" style="flex: 1;">
-                    <option value="{{ t.priority_normal }}">{{ t.priority_normal }}</option>
-                    <option value="{{ t.priority_high }}">{{ t.priority_high }}</option>
+                    <option value="normal">{{ t.priority_normal }}</option>
+                    <option value="high">{{ t.priority_high }}</option>
                 </select>
                 <select name="category" style="flex: 1;">
                     <option value="{{ t.cat_work }}">{{ t.cat_work }}</option>
@@ -81,13 +93,19 @@
             {% for task in tasks %}
             <li>
                 <div class="task-info">
-                    <strong>{{ task[1] }}</strong>
-                    <small>{{ t.due }} {{ task[2] }} | 📧 {{ task[5] }}</small>
+                    <!-- استخدام اسم الحقل مباشرة بفضل sqlite3.Row لجعل الكود أكثر وضوحاً -->
+                    <strong>{{ task.title }}</strong>
+                    <small>{{ t.due }} {{ task.due_date }} | 📧 {{ task.email }}</small>
                 </div>
                 <div class="meta">
-                    <span class="cat-badge">{{ task[4] }}</span>
-                    <span class="badge">{{ task[3] }}</span>
-                    <a href="/delete/{{ task[0] }}" class="delete-btn">{{ t.delete }}</a>
+                    <span class="cat-badge">{{ task.category }}</span>
+                    <span class="badge">
+                        {% if task.priority == 'high' %}{{ t.priority_high }}{% else %}{{ t.priority_normal }}{% endif %}
+                    </span>
+                    <!-- تحويل زر الحذف إلى Form لأن مسار بايثون يستخدم POST -->
+                    <form action="/delete/{{ task.id }}" method="POST" style="margin: 0;">
+                        <button type="submit" class="delete-btn">{{ t.delete }}</button>
+                    </form>
                 </div>
             </li>
             {% else %}
