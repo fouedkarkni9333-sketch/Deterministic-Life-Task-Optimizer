@@ -1,13 +1,12 @@
 from datetime import datetime
 import sqlite3
-from flask import Flask, jsonify, redirect, render_template_string, request
+from flask import Flask, redirect, render_template_string, request
 
 app = Flask(__name__)
 
 DB_NAME = "tasks.db"
 
 
-# دته لتهيئة قاعدة البيانات وإنشاء الجدول إذا لم يكن موجوداً
 def init_db():
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
@@ -23,19 +22,87 @@ def init_db():
   conn.close()
 
 
-# تشغيل تهيئة قاعدة البيانات عند بدء التشغيل
 init_db()
 
-# تصميم واجهة المستخدم الأنيقة
+# قاموس الترجمات الشامل للغات العالم الرئيسية (يمكن إضافة أي لغة بسهولة)
+TRANSLATIONS = {
+    "ar": {
+        "title": "منظم الحياة والمهام الذكي العالمي",
+        "placeholder": "عنوان المهمة أو الهدف...",
+        "priority_normal": "أولوية عادية",
+        "priority_high": "أولوية عالية جداً",
+        "btn": "تثبيت وإضافة المهمة",
+        "list_title": "المهام الموثقة:",
+        "due": "الموعد:",
+        "empty": "لا توجد مهام مسجلة حالياً.",
+        "dir": "rtl",
+    },
+    "zh": {
+        "title": "全球智能生活与任务优化器",
+        "placeholder": "任务标题或目标...",
+        "priority_normal": "普通优先级",
+        "priority_high": "高优先级",
+        "btn": "确认并添加任务",
+        "list_title": "已验证的任务：",
+        "due": "截止日期：",
+        "empty": "暂无记录的任务。",
+        "dir": "ltr",
+    },
+    "de": {
+        "title": "Globaler Intelligenz- und Aufgaben-Optimizer",
+        "placeholder": "Aufgabentitel oder Ziel...",
+        "priority_normal": "Normale Priorität",
+        "priority_high": "Hohe Priorität",
+        "btn": "Aufgabe hinzufügen",
+        "list_title": "Verifizierte Aufgaben:",
+        "due": "Fälligkeitsdatum:",
+        "empty": "Noch keine Aufgaben registriert.",
+        "dir": "ltr",
+    },
+    "fr": {
+        "title": "Optimiseur Intelligent de Vie et de Tâches",
+        "placeholder": "Titre de la tâche ou objectif...",
+        "priority_normal": "Priorité normale",
+        "priority_high": "Haute priorité",
+        "btn": "Confirmer et ajouter",
+        "list_title": "Tâches vérifiées :",
+        "due": "Date d'échéance :",
+        "empty": "Aucune tâche enregistrée pour le moment.",
+        "dir": "ltr",
+    },
+    "es": {
+        "title": "Optimizador Global de Vida y Tareas",
+        "placeholder": "Título de la tarea u objetivo...",
+        "priority_normal": "Prioridad normal",
+        "priority_high": "Alta prioridad",
+        "btn": "Confirmar y añadir tarea",
+        "list_title": "Tareas verificadas:",
+        "due": "Fecha límite:",
+        "empty": "No hay tareas registradas aún.",
+        "dir": "ltr",
+    },
+    "en": {
+        "title": "Global Deterministic Life & Task Optimizer",
+        "placeholder": "Task title or goal...",
+        "priority_normal": "Normal Priority",
+        "priority_high": "High Priority",
+        "btn": "Confirm & Add Task",
+        "list_title": "Verified Tasks:",
+        "due": "Due Date:",
+        "empty": "No tasks registered yet.",
+        "dir": "ltr",
+    },
+}
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="{{ lang }}" dir="{{ t.dir }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deterministic Life Optimizer</title>
+    <title>{{ t.title }}</title>
     <style>
-        body { font-family: Tahoma, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; direction: rtl; }
+        body { font-family: Tahoma, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; direction: {{ t.dir }}; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         h1 { color: #2c3e50; text-align: center; font-size: 22px; }
         form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
@@ -50,29 +117,29 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h1>منظم الحياة والمهام الصارم 100%</h1>
+        <h1>{{ t.title }}</h1>
         <form action="/add" method="POST">
-            <input type="text" name="title" placeholder="عنوان المهمة أو الهدف..." required>
+            <input type="text" name="title" placeholder="{{ t.placeholder }}" required>
             <input type="date" name="due_date" required>
             <select name="priority">
-                <option value="عادية">أولوية عادية</option>
-                <option value="عالية">أولوية عالية جداً</option>
+                <option value="{{ t.priority_normal }}">{{ t.priority_normal }}</option>
+                <option value="{{ t.priority_high }}">{{ t.priority_high }}</option>
             </select>
-            <button type="submit">تثبيت وإضافة المهمة</button>
+            <button type="submit">{{ t.btn }}</button>
         </form>
         
-        <h2>المهام الموثقة بقاعدة البيانات:</h2>
+        <h2>{{ t.list_title }}</h2>
         <ul>
             {% for task in tasks %}
             <li>
                 <div class="task-info">
                     <strong>{{ task[1] }}</strong>
-                    <small>الموعد: {{ task[2] }}</small>
+                    <small>{{ t.due }} {{ task[2] }}</small>
                 </div>
                 <span class="badge">{{ task[3] }}</span>
             </li>
             {% else %}
-            <p style="text-align: center; color: #7f8c8d;">لا توجد مهام مسجلة حالياً.</p>
+            <p style="text-align: center; color: #7f8c8d;">{{ t.empty }}</p>
             {% endfor %}
         </ul>
     </div>
@@ -83,20 +150,27 @@ HTML_TEMPLATE = """
 
 @app.route("/")
 def home():
+  # الكشف التلقائي عن لغة متصفح المستخدم في أي مكان في العالم
+  user_lang = request.accept_languages.best_match(list(TRANSLATIONS.keys()))
+  if not user_lang or user_lang not in TRANSLATIONS:
+    user_lang = "en"  # اللغة الافتراضية إذا لم يتم التعرف على اللغة
+
+  t = TRANSLATIONS[user_lang]
+
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
   cursor.execute("SELECT * FROM tasks ORDER BY id DESC")
   tasks = cursor.fetchall()
   conn.close()
-  return render_template_string(HTML_TEMPLATE, tasks=tasks)
+
+  return render_template_string(HTML_TEMPLATE, t=t, lang=user_lang, tasks=tasks)
 
 
-# محرك إضافة المهام بدقة وحفظها في SQLite
 @app.route("/add", methods=["POST"])
 def add_task_web():
   title = request.form.get("title")
   due_date = request.form.get("due_date")
-  priority = request.form.get("priority", "عادية")
+  priority = request.form.get("priority", "Normal")
 
   if title and due_date:
     try:
@@ -116,4 +190,4 @@ def add_task_web():
 
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port=5000, debug=True)
+  app.run(host="0.0.0.0", port5000, debug=True)
